@@ -5,6 +5,11 @@ const wrap = require('../core/asyncHandler');
 const { requireRole, requirePermission } = require('../core/auth');
 const { useLayout } = require('../core/locals');
 
+// Bản giao diện mẫu độc lập; không gọi API hay thay đổi nghiệp vụ.
+router.use('/customer-ui', require('express').static(
+  require('path').join(__dirname, '../views/customer/ui-preview/public')
+));
+
 router.use(useLayout('layouts/store'));
 
 const customer_register = require('../controllers/customer/register.controller');
