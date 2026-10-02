@@ -1,0 +1,9 @@
+{
+  "name": "laptop-shop-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Giao diện Laptop Shop; nghiệp vụ sẽ được tích hợp sau",
+  "scripts": { "start": "node server.js", "check": "node --check server.js && node --check public/app.js" },
+  "engines": { "node": ">=18" }
+}
