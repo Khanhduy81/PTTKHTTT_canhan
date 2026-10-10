@@ -41,7 +41,7 @@ erDiagram
     ProductSerials ||--o{ OrderDetailSerials : "SerialId"
     Orders ||--o{ Invoices : "OrderId"
     Employees ||--o{ Invoices : "IssuedByEmployee"
-    ProductSerials ||--o{ Warranties : "SerialId"
+    ProductSerials |o--o{ Warranties : "SerialId"
     OrderDetails ||--o{ Warranties : "OrderDetailId"
     Customers ||--o{ Warranties : "CustomerId"
 ```
@@ -77,7 +77,7 @@ erDiagram
 | 25 | `OrderDetails` | Chi tiết đơn hàng |
 | 26 | `OrderDetailSerials` | Serial cụ thể đã xuất bán cho từng dòng đơn (gán khi duyệt đơn) |
 | 27 | `Invoices` | Hoá đơn bán hàng (phát hành khi duyệt đơn, lưu trữ, in lại được) |
-| 28 | `Warranties` | Bảo hành điện tử theo từng Serial (tự tạo khi duyệt đơn) |
+| 28 | `Warranties` | Bảo hành theo serial hoặc dòng hàng không serial (tạo khi duyệt đơn) |
 
 ## 3. Mô tả chi tiết từng bảng
 
@@ -459,7 +459,11 @@ Mã khuyến mãi / voucher
 | `PaidAt` | DATETIME2(0) | Có |  |  | Thời điểm thanh toán |
 | `ReceiverName` | NVARCHAR(100) | Không |  |  | Người nhận (snapshot) |
 | `ReceiverPhone` | VARCHAR(15) | Không |  |  | SĐT nhận (snapshot) |
-| `ShippingAddress` | NVARCHAR(400) | Không |  |  | Địa chỉ giao (snapshot) |
+| `ShippingAddress` | NVARCHAR(600) | Không |  |  | Địa chỉ giao (snapshot) |
+| `BillingName` | NVARCHAR(100) | Không |  |  | Tên xuất hoá đơn chốt khi đặt hàng |
+| `BillingCompany` | NVARCHAR(200) | Có |  |  | Công ty xuất hoá đơn tại lúc đặt |
+| `BillingTaxCode` | VARCHAR(20) | Có |  |  | MST xuất hoá đơn tại lúc đặt |
+| `BillingAddress` | NVARCHAR(600) | Không |  |  | Địa chỉ xuất hoá đơn tại lúc đặt |
 | `Subtotal` | DECIMAL(18,0) | Không |  |  | Tổng tiền hàng |
 | `DiscountAmount` | DECIMAL(18,0) | Không |  | 0 | Giảm giá |
 | `ShippingFee` | DECIMAL(18,0) | Không |  | 0 | Phí vận chuyển |
@@ -485,6 +489,9 @@ Chi tiết đơn hàng
 | `OrderDetailId` | INT (IDENTITY) | Không | PK |  | Mã dòng chi tiết |
 | `OrderId` | INT | Không | FK → Orders |  | Đơn hàng |
 | `ProductId` | INT | Không | FK → Products |  | Sản phẩm |
+| `ProductNameSnapshot` | NVARCHAR(200) | Không |  |  | Tên sản phẩm tại thời điểm đặt |
+| `SkuSnapshot` | VARCHAR(40) | Không |  |  | SKU tại thời điểm đặt |
+| `IsSerialTrackedSnapshot` | BIT | Không |  |  | Cách quản lý bảo hành tại thời điểm đặt |
 | `Quantity` | INT | Không |  |  | Số lượng |
 | `UnitPrice` | DECIMAL(18,0) | Không |  |  | Đơn giá bán tại thời điểm đặt |
 | `CostPrice` | DECIMAL(18,0) | Không |  |  | Giá vốn tại thời điểm đặt (tính lợi nhuận) |
@@ -517,7 +524,7 @@ Hoá đơn bán hàng (phát hành khi duyệt đơn, lưu trữ, in lại đư�
 | `BuyerName` | NVARCHAR(100) | Không |  |  | Tên người mua |
 | `BuyerCompany` | NVARCHAR(200) | Có |  |  | Tên đơn vị (nếu xuất công ty) |
 | `BuyerTaxCode` | VARCHAR(20) | Có |  |  | MST người mua |
-| `BuyerAddress` | NVARCHAR(400) | Không |  |  | Địa chỉ người mua |
+| `BuyerAddress` | NVARCHAR(600) | Không |  |  | Địa chỉ người mua |
 | `SubtotalAmount` | DECIMAL(18,0) | Không |  |  | Tiền hàng |
 | `DiscountAmount` | DECIMAL(18,0) | Không |  |  | Giảm giá |
 | `VatAmount` | DECIMAL(18,0) | Không |  |  | Tiền VAT |
@@ -530,17 +537,17 @@ Hoá đơn bán hàng (phát hành khi duyệt đơn, lưu trữ, in lại đư�
 
 ### Warranties
 
-Bảo hành điện tử theo từng Serial (tự tạo khi duyệt đơn)
+Bảo hành theo serial hoặc dòng hàng không serial (tạo khi duyệt đơn)
 
 | Cột | Kiểu | Null | Khoá | Mặc định | Mô tả |
 |-----|------|------|------|----------|-------|
 | `WarrantyId` | INT (IDENTITY) | Không | PK |  | Mã bảo hành |
-| `SerialId` | BIGINT | Không | FK → ProductSerials |  | Cá thể được bảo hành |
+| `SerialId` | BIGINT | Có | FK → ProductSerials |  | NULL: bảo hành theo dòng đơn, không có serial |
+| `CoveredQuantity` | INT | Không |  | 1 | Số lượng được bảo hành |
 | `OrderDetailId` | INT | Không | FK → OrderDetails |  | Dòng đơn hàng đã bán |
 | `CustomerId` | INT | Không | FK → Customers |  | Khách hàng sở hữu |
 | `StartDate` | DATE | Không |  |  | Ngày bắt đầu |
 | `EndDate` | DATE | Không |  |  | Ngày hết hạn |
 | `Status` | VARCHAR(10) | Không |  | 'Active' | Active / Voided |
 
-**Unique:** (SerialId, OrderDetailId)  
-**Check:** `(EndDate >= StartDate)`; `(Status IN ('Active','Voided'))`
+**Check:** `(CoveredQuantity > 0 AND (SerialId IS NULL OR CoveredQuantity = 1))`; `(EndDate >= StartDate)`; `(Status IN ('Active','Voided'))`

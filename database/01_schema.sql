@@ -414,7 +414,11 @@ CREATE TABLE dbo.Orders (
     PaidAt          DATETIME2(0)  NULL,           -- Thời điểm thanh toán
     ReceiverName    NVARCHAR(100) NOT NULL,       -- Người nhận (snapshot)
     ReceiverPhone   VARCHAR(15)   NOT NULL,       -- SĐT nhận (snapshot)
-    ShippingAddress NVARCHAR(400) NOT NULL,       -- Địa chỉ giao (snapshot)
+    ShippingAddress NVARCHAR(600) NOT NULL,       -- Địa chỉ giao (snapshot)
+    BillingName     NVARCHAR(100) NOT NULL,       -- Tên xuất hoá đơn chốt khi đặt hàng
+    BillingCompany  NVARCHAR(200) NULL,           -- Công ty xuất hoá đơn tại lúc đặt
+    BillingTaxCode  VARCHAR(20)   NULL,           -- MST xuất hoá đơn tại lúc đặt
+    BillingAddress  NVARCHAR(600) NOT NULL,       -- Địa chỉ xuất hoá đơn tại lúc đặt
     Subtotal        DECIMAL(18,0) NOT NULL,       -- Tổng tiền hàng
     DiscountAmount  DECIMAL(18,0) NOT NULL CONSTRAINT DF_Ord_Disc DEFAULT 0, -- Giảm giá
     ShippingFee     DECIMAL(18,0) NOT NULL CONSTRAINT DF_Ord_Ship DEFAULT 0, -- Phí vận chuyển
@@ -445,6 +449,9 @@ CREATE TABLE dbo.OrderDetails (
     OrderDetailId   INT IDENTITY(1,1) NOT NULL,   -- Mã dòng chi tiết
     OrderId         INT           NOT NULL,       -- Đơn hàng
     ProductId       INT           NOT NULL,       -- Sản phẩm
+    ProductNameSnapshot NVARCHAR(200) NOT NULL,   -- Tên sản phẩm tại thời điểm đặt
+    SkuSnapshot     VARCHAR(40) NOT NULL,         -- SKU tại thời điểm đặt
+    IsSerialTrackedSnapshot BIT NOT NULL,         -- Cách quản lý bảo hành tại thời điểm đặt
     Quantity        INT           NOT NULL,       -- Số lượng
     UnitPrice       DECIMAL(18,0) NOT NULL,       -- Đơn giá bán tại thời điểm đặt
     CostPrice       DECIMAL(18,0) NOT NULL,       -- Giá vốn tại thời điểm đặt (tính lợi nhuận)
@@ -467,7 +474,7 @@ CREATE TABLE dbo.OrderDetailSerials (
     CONSTRAINT FK_ODS_Detail FOREIGN KEY (OrderDetailId) REFERENCES dbo.OrderDetails(OrderDetailId),
     CONSTRAINT FK_ODS_Serial FOREIGN KEY (SerialId) REFERENCES dbo.ProductSerials(SerialId)
 );
-CREATE INDEX IX_ODS_Serial ON dbo.OrderDetailSerials(SerialId);
+CREATE UNIQUE INDEX UX_ODS_Serial ON dbo.OrderDetailSerials(SerialId);
 
 -- (Bảng OrderStatusHistory đã bỏ để đơn giản hoá - việc đổi trạng thái ghi qua AuditLogs dùng chung toàn hệ thống)
 -- (Bảng Payments đã gộp vào Orders.PaymentStatus/PaidAt để đơn giản hoá - mỗi đơn 1 lần thanh toán)
@@ -482,7 +489,7 @@ CREATE TABLE dbo.Invoices (
     BuyerName       NVARCHAR(100) NOT NULL,       -- Tên người mua
     BuyerCompany    NVARCHAR(200) NULL,           -- Tên đơn vị (nếu xuất công ty)
     BuyerTaxCode    VARCHAR(20)   NULL,           -- MST người mua
-    BuyerAddress    NVARCHAR(400) NOT NULL,       -- Địa chỉ người mua
+    BuyerAddress    NVARCHAR(600) NOT NULL,       -- Địa chỉ người mua
     SubtotalAmount  DECIMAL(18,0) NOT NULL,       -- Tiền hàng
     DiscountAmount  DECIMAL(18,0) NOT NULL,       -- Giảm giá
     VatAmount       DECIMAL(18,0) NOT NULL,       -- Tiền VAT
@@ -498,22 +505,27 @@ CREATE TABLE dbo.Invoices (
 );
 CREATE INDEX IX_Invoices_IssuedAt ON dbo.Invoices(IssuedAt DESC);
 
--- [Table] Warranties: Bảo hành điện tử theo từng Serial (tự tạo khi duyệt đơn)
+-- [Table] Warranties: Bảo hành theo serial hoặc dòng hàng không serial (tạo khi duyệt đơn)
 CREATE TABLE dbo.Warranties (
     WarrantyId      INT IDENTITY(1,1) NOT NULL,   -- Mã bảo hành
-    SerialId        BIGINT        NOT NULL,       -- Cá thể được bảo hành
+    SerialId        BIGINT        NULL,           -- NULL: bảo hành theo dòng đơn, không có serial
+    CoveredQuantity INT NOT NULL CONSTRAINT DF_War_Qty DEFAULT 1, -- Số lượng được bảo hành
     OrderDetailId   INT           NOT NULL,       -- Dòng đơn hàng đã bán
     CustomerId      INT           NOT NULL,       -- Khách hàng sở hữu
     StartDate       DATE          NOT NULL,       -- Ngày bắt đầu
     EndDate         DATE          NOT NULL,       -- Ngày hết hạn
     Status          VARCHAR(10)   NOT NULL CONSTRAINT DF_War_Status DEFAULT 'Active', -- Active / Voided
     CONSTRAINT PK_Warranties PRIMARY KEY (WarrantyId),
-    CONSTRAINT UQ_Warranties UNIQUE (SerialId, OrderDetailId),
+    CONSTRAINT CK_War_Qty CHECK (CoveredQuantity > 0 AND (SerialId IS NULL OR CoveredQuantity = 1)),
     CONSTRAINT FK_War_Serial FOREIGN KEY (SerialId) REFERENCES dbo.ProductSerials(SerialId),
     CONSTRAINT FK_War_Detail FOREIGN KEY (OrderDetailId) REFERENCES dbo.OrderDetails(OrderDetailId),
     CONSTRAINT FK_War_Customer FOREIGN KEY (CustomerId) REFERENCES dbo.Customers(CustomerId),
     CONSTRAINT CK_War_Dates CHECK (EndDate >= StartDate),
     CONSTRAINT CK_War_Status CHECK (Status IN ('Active','Voided'))
 );
+CREATE UNIQUE INDEX UX_War_SerialDetail ON dbo.Warranties(SerialId, OrderDetailId) WHERE SerialId IS NOT NULL;
+CREATE UNIQUE INDEX UX_War_NonSerialDetail ON dbo.Warranties(OrderDetailId) WHERE SerialId IS NULL;
+CREATE UNIQUE INDEX UX_War_ActiveSerial ON dbo.Warranties(SerialId) WHERE SerialId IS NOT NULL AND Status = 'Active';
 CREATE INDEX IX_War_Customer ON dbo.Warranties(CustomerId);
 GO
+

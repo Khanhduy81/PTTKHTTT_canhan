@@ -14,6 +14,9 @@ Yêu cầu: **Node.js ≥ 18**, **SQL Server 2017+** (bật đăng nhập SQL - 
 4. `npm run db:check` (kiểm tra kết nối) → `npm run dev` → mở http://localhost:3000
 
 ## 2. Tài khoản mẫu (mật khẩu chung `123456`)
+
+Database đã có dữ liệu: xem [hướng dẫn nâng cấp revision 004](docs/DATABASE_REVISION_004.md), dùng migration thay vì chạy lại `01_schema.sql`. Hướng dẫn cũng mô tả các tham số billing mới, view in hoá đơn và tra cứu bảo hành không có serial.
+
 | Tài khoản | Vai trò | Vào |
 |---|---|---|
 | `admin` | Quản trị | `/admin` |
@@ -47,5 +50,6 @@ src/
 Mỗi người 1 nhánh `module-1` … `module-4` (đã tạo sẵn), chỉ sửa file thuộc module của mình - xem `docs/MODULES.md` hoặc điền tên vào `docs/Module_Signup.xlsx`. File dùng chung (`core/`, `app.js`, `views/layouts`, `database/*.sql`) sửa thì báo cả nhóm.
 
 Khi mở Pull Request về `main`, GitHub Actions tự kiểm tra code chạy được và không đụng file ngoài phạm vi module (xem `.github/workflows/`).
+
 
 
